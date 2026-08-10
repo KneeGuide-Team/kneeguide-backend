@@ -1,9 +1,68 @@
 from unittest.mock import patch
 
-from django.test import TestCase, override_settings
+from django.conf import settings
+from django.core import mail
+from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 
 from .models import EmailOTP, User
+from .services.email import (
+    LOGO_CONTENT_ID,
+    VERIFICATION_EMAIL_SUBJECT,
+    send_otp_email,
+)
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    DEFAULT_FROM_EMAIL='KneeGuide <no-reply@example.com>',
+)
+class OTPEmailTemplateTests(SimpleTestCase):
+    def test_bilingual_multipart_email_contains_expiry_and_inline_logo(self):
+        otp_code = '482731'
+
+        sent_count = send_otp_email('recipient@example.com', otp_code)
+
+        self.assertEqual(sent_count, 1)
+        self.assertEqual(len(mail.outbox), 1)
+        message = mail.outbox[0]
+        self.assertEqual(message.subject, VERIFICATION_EMAIL_SUBJECT)
+        self.assertTrue(message.body)
+        self.assertIn('تأكيد بريدك الإلكتروني', message.body)
+        self.assertIn('Verify your email', message.body)
+        self.assertIn(otp_code, message.body)
+        self.assertIn(f'{settings.OTP_EXPIRY_MINUTES} minutes', message.body)
+
+        self.assertEqual(len(message.alternatives), 1)
+        html_body = message.alternatives[0].content
+        self.assertEqual(message.alternatives[0].mimetype, 'text/html')
+        self.assertIn('lang="ar"', html_body)
+        self.assertIn('dir="rtl"', html_body)
+        self.assertIn('lang="en"', html_body)
+        self.assertIn('dir="ltr"', html_body)
+        self.assertIn('تأكيد بريدك الإلكتروني', html_body)
+        self.assertIn('Verify your email', html_body)
+        self.assertGreaterEqual(html_body.count(otp_code), 2)
+        self.assertIn(f'cid:{LOGO_CONTENT_ID}', html_body)
+        self.assertIn(f'{settings.OTP_EXPIRY_MINUTES} minutes', html_body)
+
+        inline_images = [
+            attachment
+            for attachment in message.attachments
+            if hasattr(attachment, 'get_content_maintype')
+            and attachment.get_content_maintype() == 'image'
+        ]
+        self.assertEqual(len(inline_images), 1)
+        logo = inline_images[0]
+        self.assertEqual(logo.get('Content-ID'), f'<{LOGO_CONTENT_ID}>')
+        self.assertEqual(logo.get_content_subtype(), 'png')
+        self.assertIn('inline', logo.get('Content-Disposition'))
+
+        rendered_message = f'{message.body}\n{html_body}'
+        self.assertNotIn('C:\\', rendered_message)
+        self.assertNotIn('SECRET_KEY', rendered_message)
+        self.assertNotIn('password', rendered_message.lower())
+        self.assertNotIn('jwt', rendered_message.lower())
 
 
 @override_settings(ALLOWED_HOSTS=['testserver'])
@@ -64,6 +123,7 @@ class AuthLifecycleTests(TestCase):
         self.assertEqual(resend_response.status_code, 200)
         self.assertEqual(resend_response.data, {'message': 'OTP resent'})
         self.assertEqual(EmailOTP.objects.filter(user=user).count(), 2)
+        self.assertEqual(send_email.call_count, 2)
 
         latest_otp = EmailOTP.objects.filter(user=user).last()
         verify_response = self.client.post(
