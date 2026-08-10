@@ -118,3 +118,7 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+EMAIL_LOGO_URL = os.getenv(
+    "EMAIL_LOGO_URL",
+    "https://knee.fyaa.io/logo192.png",
+)

@@ -7,8 +7,6 @@ from rest_framework.test import APIClient
 
 from .models import EmailOTP, User
 from .services.email import (
-    LOGO_CONTENT_ID_DOMAIN,
-    LOGO_CONTENT_ID_PREFIX,
     VERIFICATION_EMAIL_SUBJECT,
     send_otp_email,
 )
@@ -17,9 +15,10 @@ from .services.email import (
 @override_settings(
     EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
     DEFAULT_FROM_EMAIL='KneeGuide <no-reply@example.com>',
+    EMAIL_LOGO_URL='https://knee.fyaa.io/logo192.png',
 )
 class OTPEmailTemplateTests(SimpleTestCase):
-    def test_bilingual_multipart_email_contains_expiry_and_inline_logo(self):
+    def test_bilingual_multipart_email_uses_public_https_logo(self):
         otp_code = '482731'
 
         sent_count = send_otp_email('recipient@example.com', otp_code)
@@ -45,47 +44,29 @@ class OTPEmailTemplateTests(SimpleTestCase):
         self.assertIn('Verify your email', html_body)
         self.assertGreaterEqual(html_body.count(otp_code), 2)
         self.assertIn(f'{settings.OTP_EXPIRY_MINUTES} minutes', html_body)
-
-        inline_images = [
-            attachment
-            for attachment in message.attachments
-            if hasattr(attachment, 'get_content_maintype')
-            and attachment.get_content_maintype() == 'image'
-        ]
-        self.assertEqual(len(inline_images), 1)
-        logo = inline_images[0]
-        content_id = logo.get('Content-ID')
         self.assertIn(
-            f'.{LOGO_CONTENT_ID_PREFIX}@{LOGO_CONTENT_ID_DOMAIN}>',
-            content_id,
+            f'src="{settings.EMAIL_LOGO_URL}"',
+            html_body,
         )
-        self.assertIn(f'cid:{content_id[1:-1]}', html_body)
-        self.assertEqual(logo.get('X-Attachment-Id'), content_id[1:-1])
-        self.assertEqual(logo.get_content_subtype(), 'png')
-        self.assertIn('inline', logo.get('Content-Disposition'))
-        self.assertEqual(logo.get_filename(), 'kneeguide-logo.png')
-        self.assertGreater(len(logo.get_payload(decode=True)), 0)
+        self.assertIn('alt="KneeGuide"', html_body)
+        self.assertNotIn('cid:', html_body)
+        self.assertEqual(message.attachments, [])
 
         mime_root = message.message()
         self.assertEqual(mime_root.get_content_type(), 'multipart/alternative')
         root_parts = mime_root.get_payload()
         self.assertEqual(
             [part.get_content_type() for part in root_parts],
-            ['text/plain', 'multipart/related'],
+            ['text/plain', 'text/html'],
         )
-        related_parts = root_parts[1].get_payload()
-        self.assertEqual(root_parts[1].get_param('type'), 'text/html')
-        self.assertEqual(
-            [part.get_content_type() for part in related_parts],
-            ['text/html', 'image/png'],
+        serialized_html = root_parts[1].get_payload(decode=True).decode(
+            root_parts[1].get_content_charset()
         )
-        serialized_html = related_parts[0].get_payload(decode=True).decode(
-            related_parts[0].get_content_charset()
+        self.assertIn(
+            f'src="{settings.EMAIL_LOGO_URL}"',
+            serialized_html,
         )
-        serialized_logo = related_parts[1]
-        self.assertIn(f'cid:{content_id[1:-1]}', serialized_html)
-        self.assertEqual(serialized_logo.get('Content-ID'), content_id)
-        self.assertGreater(len(serialized_logo.get_payload(decode=True)), 0)
+        self.assertNotIn('cid:', serialized_html)
 
         rendered_message = f'{message.body}\n{html_body}'
         self.assertNotIn('C:\\', rendered_message)
