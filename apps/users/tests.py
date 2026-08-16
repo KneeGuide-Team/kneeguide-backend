@@ -1,7 +1,9 @@
 from unittest.mock import patch
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.core import mail
+from django.urls import reverse
 from django.test import SimpleTestCase, TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -183,3 +185,45 @@ class AuthLifecycleTests(TestCase):
             User.objects.filter(email='new.patient@example.com').exists()
         )
         self.assertEqual(EmailOTP.objects.count(), 0)
+
+
+class AdminUserCreationTests(TestCase):
+    def setUp(self):
+        self.admin_password = 'AdminContract1!'
+        self.admin_user = get_user_model().objects.create_superuser(
+            username='admin@example.com',
+            email='admin@example.com',
+            password=self.admin_password,
+        )
+        self.client.force_login(self.admin_user)
+
+    def test_admin_creates_patient_and_doctor_with_email_identity(self):
+        add_url = reverse('admin:users_user_add')
+
+        for role in ('patient', 'doctor'):
+            with self.subTest(role=role):
+                email = f'admin-created-{role}@example.com'
+                password = 'CreatedContract1!'
+                response = self.client.post(
+                    add_url,
+                    {
+                        'email': email.upper(),
+                        'password1': password,
+                        'password2': password,
+                        'role': role,
+                        'is_staff': '',
+                        'is_superuser': '',
+                        'usable_password': 'true',
+                        '_save': 'Save',
+                    },
+                )
+
+                self.assertEqual(response.status_code, 302)
+                user = get_user_model().objects.get(email=email)
+                self.assertEqual(user.username, email)
+                self.assertEqual(user.role, role)
+                self.assertTrue(user.is_active)
+                self.assertFalse(user.is_staff)
+                self.assertFalse(user.is_superuser)
+                self.assertTrue(user.check_password(password))
+                self.assertNotEqual(user.password, password)
