@@ -13,7 +13,7 @@
   <p>
     <a href="https://knee.fyaa.io/">Live Platform</a> ·
     <a href="https://kneeguide-backend.onrender.com/">Backend Service</a> ·
-    <a href="https://github.com/FahadAlshwihani/kneeguide-frontend">Frontend Repository</a> ·
+    <a href="https://github.com/KneeGuide-Team/kneeguide-frontend">Frontend Repository</a> ·
     <a href="https://fyaa.io/">Developer Portfolio</a>
   </p>
 </div>
@@ -468,7 +468,7 @@ The production provider is intentionally not named because repository configurat
 ### Windows PowerShell
 
 ```powershell
-git clone https://github.com/FahadAlshwihani/kneeguide-backend.git
+git clone https://github.com/KneeGuide-Team/kneeguide-backend.git
 cd kneeguide-backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -480,7 +480,7 @@ python manage.py runserver
 ### macOS / Linux
 
 ```bash
-git clone https://github.com/FahadAlshwihani/kneeguide-backend.git
+git clone https://github.com/KneeGuide-Team/kneeguide-backend.git
 cd kneeguide-backend
 python3 -m venv .venv
 source .venv/bin/activate
@@ -624,7 +624,7 @@ flowchart LR
 
 The product experience, bilingual public site, authentication screens, and patient/doctor dashboards live in:
 
-**[FahadAlshwihani/kneeguide-frontend](https://github.com/FahadAlshwihani/kneeguide-frontend)**
+**[KneeGuide-Team/kneeguide-frontend](https://github.com/KneeGuide-Team/kneeguide-frontend)**
 
 The frontend README documents which features use the real API and which remain on the demonstration data layer.
 
